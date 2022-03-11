@@ -1,17 +1,17 @@
-; EEPROM Programmer for AT28Cxx using PIC16F628
+; EEPROM Programmer for AT28Cxx using PIC16F62x
 ;
 ; CAT28C256 supports 64-byte page-writes, but too fast
 ; for serial port; byte-writes need 5ms between writes
 ; which is too slow for serial port.
 
-; RB4,RB5,RB6,RB7,PA6,PA7,PA0,PA1: DATA
-; PB0; /WE
-; PB1: RX
-; PB2: TX
-; PB3: /OE
-; PA2: SHIFT CLOCK
-; PA3: SHIFT LATCH
-; PA4: SHIFT DATA (w/ pull-up)
+; RB4,RB5,RB6,RB7,RA6,RA7,RA0,RA1: DATA
+; RB0; /WE
+; RB1: RX
+; RB2: TX
+; RB3: /OE
+; RA2: SHIFT CLOCK
+; RA3: SHIFT LATCH
+; RA4: SHIFT DATA (w/ pull-up)
 
 	include "p16f628.inc"
 
@@ -51,7 +51,7 @@ hex2asc:
 	ADDWF	PCL,F
 	.dt	0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x41,0x42,0x43,0x44,0x45,0x46
 intros:
-	.dt	"AT28C64 programmer (PIC16F627)\r\n", 0
+	.dt	"AT28C64 programmer (PIC16F62x)\r\n", 0
 erases:
 	.dt	"Erasing...\r\n", 0
 unlocks:
