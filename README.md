@@ -2,7 +2,7 @@ The original sources can be found here: https://github.com/gmcgarry/eeprog
 
 # eeprog
 
-Basic programmer for AT28C64 EEPROMs using two 74HC595 and PIC16F62x.
+Basic programmer for AT28C64 EEPROMs using two 74HC595 logic chips and PIC16F62x microcontroller.
 
 ![Programmer](programmer.png)
 
@@ -19,7 +19,7 @@ It currently supports the following features:
 In the future:
 
 - toggle-select chip type
-- page writes for CAT27C256
+- page writes for CAT28C256
 - /DATA polling
 
 ## Software
@@ -37,7 +37,7 @@ The following commands are supported:
 | 'D' | dump memory between 0x0000 and 0x8000 |
 | 'E' | erase memory between 0x0000 and 0x8000 |
 | ':' | parse to eol as ihex line to write memory |
-| 'F' | toggle fast erase (1ms) vs (5ms) |
+| 'F' | toggle fast erase (1ms vs 5ms) |
 | 'U' | unlock SDP on CAT28C256 EEPROMs |
 
 With these commands, an EEPROM can be programmed by cut-and-pasting a
@@ -51,7 +51,9 @@ latch the 16-bit address on the address bus.  The data bus is connected
 directly to the PIC16F62x.
 
 The pin arrangement on the PIC is more complex than initially intended due
-to the shared role of some of the pins.
+to functions attached to some of the pins.  The UART pins sit in the middle
+of PORTB and the /MCLR pin on PORTA is input only.  Consequently, the data
+bus is driven by the top nibble of PORTB and pins RA0,RA1,RA6,RA7 on PORTA.
 
 | pin | name | function |
 | --- | --- | --- |
@@ -74,10 +76,8 @@ to the shared role of some of the pins.
 | 17| RA0 | D6 |
 | 18| RA1 | D7 |
 
-The UART pins sit in the middle of PORTB and the /MCLR pin
-on PORTA is input only.  Consequently, the data bus is driven by the
-top nibble of PORTB and pins RA0,RA1,RA6,RA7 on PORTA.  The nice result is
-that the data bus connects to the pins on the right side of the PIC.
+The nice result is that the data bus connects to the pins on the right
+side of the PIC.
 
 ~~~~
          +---v---+

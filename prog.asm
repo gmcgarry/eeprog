@@ -529,7 +529,7 @@ getdata:
 	RLF	TEMP,F
 	SWAPF	PORTB,W		; read data on PORT B
 	ANDLW	(~PBMASK&0xFF)
-	ANDWF	TEMP,W
+	IORWF	TEMP,W
 	RETURN
  
 getchar:
@@ -598,7 +598,7 @@ gethex:
 	SUBLW	('A' - 1 - '0')
 
 	SWAPF	TEMP,F
-	ANDWF	TEMP,W
+	IORWF	TEMP,W
 	RETURN
 
 	END
