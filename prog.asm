@@ -99,6 +99,7 @@ main:
 	CLRF	FASTERASE
 loop:
 	CALL	getchar
+	IORLW	0x20		; convert to lowercase
 
 	MOVWF	TEMP
 1:
@@ -110,35 +111,35 @@ loop:
 	GOTO	loop
 2:
 	MOVF	TEMP,W
-	XORLW	'E'
+	XORLW	'e'
 	BTFSS	STATUS,Z
 	GOTO	3f
 	CALL	EraseMemory
 	GOTO	loop
 3:
 	MOVF	TEMP,W
-	XORLW	'D'
+	XORLW	'd'
 	BTFSS	STATUS,Z
 	GOTO	4f
 	CALL	DumpMemory
 	GOTO	loop
 4:
 	MOVF	TEMP,W
-	XORLW	'H'
+	XORLW	'h'
 	BTFSS	STATUS,Z
 	GOTO	5f
 	CALL	Help
 	GOTO	loop
 5:
 	MOVF	TEMP,W
-	XORLW	'U'
+	XORLW	'u'
 	BTFSS	STATUS,Z
 	GOTO	6f
 	CALL	Unlock
 	GOTO	loop
 6:
 	MOVF	TEMP,W
-	XORLW	'F'
+	XORLW	'f'
 	BTFSS	STATUS,Z
 	GOTO	7f
 	CALL	ToggleFastErase
@@ -585,17 +586,19 @@ puthex:
 ; W contains byte value
 gethex:
 	CALL	getchar
-	SUBLW	('A' - 1)		; 'A' - 1 - W
+	IORLW	0x20			; convert to lowercase
+	SUBLW	('a' - 1)		; 'a' - 1 - W
 	BTFSS	STATUS,C
-	ADDLW	('A' - '0' - 10)	; 
-	SUBLW	('A' - 1 - '0')
+	ADDLW	('a' - '0' - 10)	; correct
+	SUBLW	('a' - 1 - '0')
 	MOVWF	TEMP
 
 	CALL	getchar
-	SUBLW	('A' - 1)		; 'A' - 1 - W
+	IORLW	0x20
+	SUBLW	('a' - 1)
 	BTFSS	STATUS,C
-	ADDLW	('A' - '0' - 10)	; 
-	SUBLW	('A' - 1 - '0')
+	ADDLW	('a' - '0' - 10)
+	SUBLW	('a' - 1 - '0')
 
 	SWAPF	TEMP,F
 	IORWF	TEMP,W
