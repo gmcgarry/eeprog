@@ -22,8 +22,6 @@ MCLK		EQU	4000000
 RATE		EQU	19200
 BAUD		EQU	(MCLK / 16 / RATE) - 1	; for BRGH=1
 
-SZMASK		EQU	0x80	; 0x80=32KB, 0x40=16KB, 0x20=8KB
-
 SHCLK		EQU	2	; PORT A
 SHLAT		EQU	3
 SHDAT		EQU	4
@@ -40,7 +38,14 @@ COUNT		EQU	0x21
 PTRH		EQU	0x22
 PTRL		EQU	0x23
 BYTECNT		EQU	0x24	; WriteMemory loop
-FASTERASE	EQU	0x25	; Fast Erase Flag
+
+ROMMASK		EQU	0x26 ; mask is (1<<ROMTYPE) 32KB=0x80, 16KB=0x40, 8KB=0x20, 4KB=0x10, 2KB=0x08, 1KB=0x04
+ROM1KB		EQU	2
+ROM2KB		EQU	3
+ROM4KB		EQU	4
+ROM8KB		EQU	5
+ROM16KB		EQU	6
+ROM32KB		EQU	7
 
 	ORG	0x0000
 	GOTO	main
@@ -58,16 +63,12 @@ unlocks:
 	.dt	"Unlocking...\r\n", 0
 dones:
 	.dt	"done\r\n", 0
-fasts:
-	.dt	"fast erase ", 0
-ons:
-	.dt	"on", 0
-offs:
-	.dt	"off", 0
-crlfs:
-	.dt	"\r\n", 0
+romtypes:
+	.dt	"ROM type set to ", 0
+kbs:
+	.dt	"KB\r\n", 0
 helps:
-	.dt	"H=help, :=ihex write, E=erase, D=dump, U=unlock, F=toggle fast erase\r\n", 0
+	.dt	"H=help, :=ihex write, E=erase, D=dump, U=unlock, T=toggle ROM type\r\n", 0
 
 main:
 	CLRF	PCLATH
@@ -94,11 +95,14 @@ main:
 	MOVWF	PTRH
 	MOVLW	low intros
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
-	CLRF	FASTERASE
+	MOVLW	(1<<ROM8KB)
+	MOVWF	ROMMASK
+	CALL	PrintRomType
+
 loop:
-	CALL	getchar
+	CALL	getc
 	IORLW	0x20		; convert to lowercase
 
 	MOVWF	TEMP
@@ -139,10 +143,10 @@ loop:
 	GOTO	loop
 6:
 	MOVF	TEMP,W
-	XORLW	'f'
+	XORLW	't'
 	BTFSS	STATUS,Z
 	GOTO	7f
-	CALL	ToggleFastErase
+	CALL	ToggleRomType
 	GOTO	loop
 7:
 	GOTO	loop
@@ -152,44 +156,55 @@ Help:
 	MOVWF	PTRH
 	MOVLW	low intros
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 	MOVLW	high helps
 	MOVWF	PTRH
 	MOVLW	low helps
 	MOVWF	PTRL
-	CALL	putstr
-	RETURN
+	CALL	puts
+	GOTO	PrintRomType
+	; no return
 
-ToggleFastErase:
-	MOVLW	0x01		; toggle LSB
-	XORWF	FASTERASE,F
+ToggleRomType:
+	BCF	STATUS,C
+	RLF	ROMMASK,F
+	MOVLW	(1<<ROM1KB)
+	BTFSC	STATUS,C	; check if too big
+	MOVWF	ROMMASK
+	; fallthru
 
-	MOVLW	high fasts
+PrintRomType:
+
+	MOVLW	high romtypes
 	MOVWF	PTRH
-	MOVLW	low fasts
+	MOVLW	low romtypes
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
-	BTFSC	FASTERASE,0
-	GOTO	1f
-	MOVLW	high offs
-	MOVWF	PTRH
-	MOVLW	low offs
-	MOVWF	PTRL
-	CALL	putstr
+	MOVF	ROMMASK,W	; check if 1,2,4,8KB
+	SUBLW	(1<<ROM8KB)
+	BTFSC	STATUS,C
 	GOTO	2f
-1:
-	MOVLW	high ons
-	MOVWF	PTRH
-	MOVLW	low ons
-	MOVWF	PTRL
-	CALL	putstr
+	BTFSC	ROMMASK,ROM16KB	; check if 16KB
+	MOVLW	0x16
+	BTFSC	ROMMASK,ROM32KB	; check if 32KB
+	MOVLW	0x32
+	CALL	puthex
+	GOTO	3f
 2:
-	MOVLW	high crlfs
+	MOVF	ROMMASK,W	; shift and use puthex
+	MOVWF	TEMP
+	BCF	STATUS,C
+	RRF	TEMP,F
+	RRF	TEMP,W
+	CALL	hex2asc
+	CALL	putc
+3:
+	MOVLW	high kbs
 	MOVWF	PTRH
-	MOVLW	low crlfs
+	MOVLW	low kbs
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 	RETURN
 
 ; unlocks CAT28C256 chips
@@ -198,7 +213,7 @@ Unlock:
 	MOVWF	PTRH
 	MOVLW	low unlocks
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
 	BANKSEL	TRISA		; setup port A for output
 	CLRF	TRISA
@@ -266,7 +281,7 @@ Unlock:
 	MOVWF	PTRH
 	MOVLW	low dones
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
 	RETURN
 
@@ -287,9 +302,9 @@ DumpMemory:
 	CALL	puthex
 
 	MOVLW	':'
-	CALL	putchar
+	CALL	putc
 	MOVLW	' '
-	CALL	putchar
+	CALL	putc
 2:
 	CALL	shiftaddr	; shift out the address
 
@@ -309,9 +324,9 @@ DumpMemory:
 	GOTO	2b
 
 	MOVLW	'\r'
-	CALL	putchar
+	CALL	putc
 	MOVLW	'\n'
-	CALL	putchar
+	CALL	putc
 
 	; bail on keyboard hit
 	BTFSC	PIR1,RCIF	; check for RX
@@ -320,9 +335,9 @@ DumpMemory:
 	MOVF	PTRL,W
 	BTFSS	STATUS,Z
 	GOTO	1b
-	MOVF	PTRH,W
-	XORLW	SZMASK		; check if 32KB done
-	BTFSS	STATUS,Z
+	MOVF	ROMMASK,W
+	XORWF	PTRH,W
+	BTFSS	STATUS,Z	; check if done
 	GOTO	1b
 
 	RETURN
@@ -370,13 +385,13 @@ WriteMemory:
 	DECFSZ	BYTECNT,F
 	GOTO	1b
 9:
-	CALL	getchar
+	CALL	getc
 	XORLW	'\r'
 	BTFSS	STATUS,Z
 	GOTO	9b
 
 	MOVLW	'.'
-	CALL	putchar
+	CALL	putc
 
 	RETURN
 
@@ -385,7 +400,7 @@ EraseMemory:
 	MOVWF	PTRH
 	MOVLW	low erases
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
 	BANKSEL	TRISA		; setup port A for output
 	CLRF	TRISA
@@ -422,23 +437,23 @@ EraseMemory:
 	MOVF	PTRL,W
 	CALL	puthex
 	MOVLW	'\r'
-	CALL	putchar
+	CALL	putc
 
-	MOVF	PTRH,W		; check if 32KB done
-	XORLW	SZMASK		; check if 32KB done
-	BTFSS	STATUS,Z
+	MOVF	ROMMASK,W
+	XORWF	PTRH,W
+	BTFSS	STATUS,Z	; check if done
 	GOTO	1b
 
 	MOVLW	high dones
 	MOVWF	PTRH
 	MOVLW	low dones
 	MOVWF	PTRL
-	CALL	putstr
+	CALL	puts
 
 	RETURN
 
 delay:
-	BTFSS	FASTERASE,0
+	BTFSC	ROMMASK,ROM32KB
 	GOTO	delay5
 	; fall-through
 
@@ -533,9 +548,9 @@ getdata:
 	IORWF	TEMP,W
 	RETURN
  
-getchar:
+getc:
 	BTFSS	PIR1,RCIF	; check for RX
-	GOTO	getchar
+	GOTO	getc
 	MOVF	RCREG,W		; receive byte
 	BTFSS	RCSTA,OERR	; check if overrun
 	RETURN
@@ -543,9 +558,9 @@ getchar:
 	BSF	RCSTA,CREN	; enable continuous
 	RETURN
 
-putchar:
+putc:
 	BTFSS	PIR1,TXIF	; wait for previous transmit to complete
-	GOTO	putchar
+	GOTO	putc
 	MOVWF	TXREG		; transmit byte
 	RETURN
 
@@ -557,16 +572,16 @@ lookupTBL:
 	MOVWF	PCL
 
 ; PTRH:PTRL contains pointer to string
-putstr:
+puts:
 	CALL	lookupTBL
 	XORLW	0x00
 	BTFSC	STATUS,Z	; Z=1, if the two values are equal
 	RETURN
-	CALL	putchar
+	CALL	putc
 	INCF	PTRL,F
 	BTFSC	STATUS,Z
 	INCF	PTRH,F
-	GOTO	putstr
+	GOTO	puts
 
 ; W contains byte value
 ; retains W (useful for debugging)
@@ -575,17 +590,17 @@ puthex:
 	SWAPF	TEMP,W
 	ANDLW	0x0F
 	CALL	hex2asc
-	CALL	putchar
+	CALL	putc
 	MOVF	TEMP,W
 	ANDLW	0x0F
 	CALL	hex2asc
-	CALL	putchar
+	CALL	putc
 	MOVF	TEMP,W
 	RETURN
 
 ; W contains byte value
 gethex:
-	CALL	getchar
+	CALL	getc
 	IORLW	0x20			; convert to lowercase
 	SUBLW	('a' - 1)		; 'a' - 1 - W
 	BTFSS	STATUS,C
@@ -593,7 +608,7 @@ gethex:
 	SUBLW	('a' - 1 - '0')
 	MOVWF	TEMP
 
-	CALL	getchar
+	CALL	getc
 	IORLW	0x20
 	SUBLW	('a' - 1)
 	BTFSS	STATUS,C
