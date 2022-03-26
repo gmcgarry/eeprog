@@ -343,7 +343,6 @@ DumpMemory:
 	RETURN
 
 WriteMemory:
-
 	BANKSEL	TRISA		; setup port A for output
 	CLRF	TRISA
 	MOVLW	(1<<RX)		; setup port B for output
@@ -369,14 +368,15 @@ WriteMemory:
 1:
  	CALL	shiftaddr	; shift out the address
  	CALL	gethex
-	CALL	setdata
+	CALL	setdata		; leaves PORTA in W
  	BCF	PORTB,WE	; write enable
  	BSF	PORTB,WE	; write disable
  
 	; delaying will cause the UART to overrun
 	; hopefully the UART isn't running greater than 19200
 	; - CAT28C256 requires 5ms...
-;	CALL	delay		; 1ms 
+;	CALL	delay
+	CALL	wait_for_write	; W=PORTA output
 
 	INCF	PTRL,F
 	BTFSC	STATUS,Z
@@ -413,14 +413,15 @@ EraseMemory:
 1:
 	CALL	shiftaddr	; shift out the address
 
-	MOVLW	PAMASK		; write the data (0xFF)
-	MOVWF	PORTA
 	MOVLW	(1<<OE)|(1<<WE)|(1<<RX)|PBMASK
 	MOVWF	PORTB
+	MOVLW	PAMASK		; write the data (0xFF)
+	MOVWF	PORTA
 
 	BCF	PORTB,WE	; write enable
 	BSF	PORTB,WE	; write disable
-	CALL	delay		; 1ms - AT28C64, 5ms - CAT28C256
+;	CALL	delay
+	CALL	wait_for_write	; W=PORTA output
 
 	INCF	PTRL,F
 	BTFSS	STATUS,Z
@@ -452,11 +453,31 @@ EraseMemory:
 
 	RETURN
 
+; /data polling on D7 -> PA1
+wait_for_write
+	MOVWF	TEMP
+ 	BANKSEL	TRISA		; setup port A for input
+	MOVLW	PAMASK
+	MOVWF	TRISA
+ 	BANKSEL	PORTA
+1:
+ 	BCF	PORTB,OE	; output enable
+	MOVF	PORTA,W
+	BSF	PORTB,OE	; output disable
+	XORWF	TEMP,W
+	ANDLW	2		; mask off PA1
+	BTFSS	STATUS,Z
+	GOTO	1b
+	BANKSEL	TRISA		; setup port A for output
+	CLRF	TRISA
+ 	BANKSEL	PORTA
+	RETURN
+
+; 1ms - AT28C64, 5ms - CAT28C256
 delay:
 	BTFSC	ROMMASK,ROM32KB
 	GOTO	delay5
 	; fall-through
-
 ; delay 1ms
 delay1:						; 2
 	MOVLW	MCLK / 4 / 1000 / 4 - 1		; 1
@@ -465,7 +486,6 @@ delay1:						; 2
 	BTFSC	STATUS,C			; 1
 	GOTO	1b				; 2
 	RETURN					; 2
-
 ; delay (more than) 5ms
 delay5:
 	CALL delay1
