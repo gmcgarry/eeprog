@@ -14,7 +14,7 @@ It currently supports the following features:
 - erase all
 - write hex line
 - unlock AT28C256 SDP
-- toggle between fast erase (AT28C64) or slow erase (CAT28C256)
+- toggle between ROM types (1KB, 2KB, 4KB, 8KB, 16KB, 32KB)
 
 In the future:
 
@@ -37,7 +37,7 @@ The following commands are supported:
 | 'D' | dump memory between 0x0000 and 0x8000 |
 | 'E' | erase memory between 0x0000 and 0x8000 |
 | ':' | parse to eol as ihex line to write memory |
-| 'F' | toggle fast erase (1ms vs 5ms) |
+| 'T' | toggle ROM type (1KB, 2KB, 4KB, 8KB, 16KB, 32KB) |
 | 'U' | unlock SDP on CAT28C256 EEPROMs |
 
 With these commands, an EEPROM can be programmed by cut-and-pasting a
