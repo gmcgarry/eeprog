@@ -13,41 +13,41 @@
 ; RA3: SHIFT LATCH
 ; RA4: SHIFT DATA (w/ pull-up)
 
-	include "p16f628.inc"
+	.include "p16f628.inc"
 
-	PROCESSOR P16F628
-	config _CP_OFF & _PWRTE_ON & _WDT_OFF & _LVP_OFF & _MCLRE_OFF & _BODEN_ON & _INTRC_OSC_NOCLKOUT
+	.device	P16F628
+	.config	_CP_OFF & _PWRTE_ON & _WDT_OFF & _LVP_OFF & _MCLRE_OFF & _BODEN_ON & _INTRC_OSC_NOCLKOUT
 
-MCLK		EQU	4000000
-RATE		EQU	19200
-BAUD		EQU	(MCLK / 16 / RATE) - 1	; for BRGH=1
+	.equ	MCLK,		4000000
+	.equ	RATE,		19200
+	.equ	BAUD,		(MCLK / 16 / RATE) - 1	; for BRGH=1
 
-SHCLK		EQU	2	; PORT A
-SHLAT		EQU	3
-SHDAT		EQU	4
-PAMASK		EQU	0xC3
+	.equ	SHCLK,		2	; PORT A
+	.equ	SHLAT,		3
+	.equ	SHDAT,		4
+	.equ	PAMASK,		0xC3
 
-WE		EQU	0	; PORT B
-RX		EQU	1
-TX		EQU	2
-OE		EQU	3
-PBMASK		EQU	0xF0
+	.equ	WE,		0	; PORT B
+	.equ	RX,		1
+	.equ	TX,		2
+	.equ	OE,		3
+	.equ	PBMASK,		0xF0
 
-TEMP		EQU	0x20
-COUNT		EQU	0x21
-PTRH		EQU	0x22
-PTRL		EQU	0x23
-BYTECNT		EQU	0x24	; WriteMemory loop
+	.equ	TEMP,		0x20
+	.equ	COUNT,		0x21
+	.equ	PTRH,		0x22
+	.equ	PTRL,		0x23
+	.equ	BYTECNT,	0x24	; WriteMemory loop
 
-ROMMASK		EQU	0x26	; mask is (1<<ROMTYPE) 32KB=0x80, 16KB=0x40, 8KB=0x20, 4KB=0x10, 2KB=0x08, 1KB=0x04
-ROM1KB		EQU	2
-ROM2KB		EQU	3
-ROM4KB		EQU	4
-ROM8KB		EQU	5
-ROM16KB		EQU	6
-ROM32KB		EQU	7
+	.equ	ROMMASK,	0x25	; mask is (1<<ROMTYPE) 32KB=0x80, 16KB=0x40, 8KB=0x20, 4KB=0x10, 2KB=0x08, 1KB=0x04
+	.equ	ROM1KB,		2
+	.equ	ROM2KB,		3
+	.equ	ROM4KB,		4
+	.equ	ROM8KB,		5
+	.equ	ROM16KB,	6
+	.equ	ROM32KB,	7
 
-	ORG	0x0000
+	.org	0
 	GOTO	main
 
 ; keep tables in the first page
@@ -56,11 +56,13 @@ hex2asc:
 	ADDWF	PCL,F
 	.dt	0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x41,0x42,0x43,0x44,0x45,0x46
 intros:
-	.dt	"AT28C64 programmer (PIC16F62x)\r\n", 0
+	.dt	"\r\nAT28Cxx programmer (PIC16F62x)\r\n", 0
 erases:
 	.dt	"Erasing...\r\n", 0
 unlocks:
 	.dt	"Unlocking...\r\n", 0
+restarts:
+	.dt	"Restarting...\r\n", 0
 dones:
 	.dt	"done\r\n", 0
 romtypes:
@@ -68,7 +70,7 @@ romtypes:
 kbs:
 	.dt	"KB\r\n", 0
 helps:
-	.dt	"H=help, :=ihex write, E=erase, D=dump, U=unlock, T=toggle ROM type\r\n", 0
+	.dt	"H=help, :=ihex write, E=erase, D=dump, U=unlock, T=toggle ROM type, R=reset\r\n", 0
 
 main:
 	CLRF	PCLATH
@@ -89,7 +91,8 @@ main:
 	BSF	PORTB,OE	; disable WE and OE
 	BSF	PORTB,WE
 
-	CALL	init_uart
+	CALL	UartInit
+	CALL	Autobaud
 
 	MOVLW	high intros
 	MOVWF	PTRH
@@ -106,6 +109,8 @@ loop:
 	IORLW	0x20		; convert to lowercase
 
 	MOVWF	TEMP
+	BTFSC	TEMP,7		; if high-bit set, then autobaud failed
+	GOTO	0
 1:
 	MOVF	TEMP,W
 	XORLW	':'
@@ -149,14 +154,25 @@ loop:
 	CALL	ToggleRomType
 	GOTO	loop
 7:
+	MOVF	TEMP,W
+	XORLW	'r'
+	BTFSS	STATUS,Z
+	GOTO	8f
+	CALL	Restart
+8:
 	GOTO	loop
 
-Help:
-	MOVLW	high intros
+Restart:
+	MOVLW	high restarts
 	MOVWF	PTRH
-	MOVLW	low intros
+	MOVLW	low restarts
 	MOVWF	PTRL
 	CALL	puts
+	CALL	flush
+	GOTO	0
+	; no return
+
+Help:
 	MOVLW	high helps
 	MOVWF	PTRH
 	MOVLW	low helps
@@ -496,7 +512,7 @@ shiftaddr:
 	BCF	PORTA,SHLAT
 	RETURN
 
-init_uart:
+UartInit:
 	BANKSEL	TRISB
 	BSF	TRISB,RX		; RX for input
 	BCF	TRISB,TX		; TX for output
@@ -510,8 +526,75 @@ init_uart:
 
 	BANKSEL	RCSTA
 	; enable UART rx, 8-bit, continuous-receive mode
-	MOVLW	(1<<SPEN) | (1<<CREN)
+	MOVLW	(1<<SPEN)|(1<<CREN)
 	MOVWF	RCSTA
+	RETURN
+
+; expect CR and time bit pattern: 0 | 1 0 1 1 0 0 0 0 | 1
+Autobaud:
+	BANKSEL	OPTION_REG
+	CLRWDT			; required to avoid reset when modifying TMR0 prescaler
+	MOVLW	0x03		; 1:16 prescaler for Timer 0
+	MOVWF	OPTION_REG
+
+	BANKSEL	RCSTA
+	BCF	RCSTA,CREN	; stop UART RX
+	MOVF    RCREG,W		; empty the UART receive buffer
+	MOVF	RCREG,W
+1:
+	CLRF	PTRH
+	CLRF	PTRL
+2:
+	BTFSS	PORTB,RX	; ensure at least 100ms of silence
+	GOTO	1b
+	DECFSZ	PTRL,F
+	GOTO	2b
+	DECFSZ	PTRH,F
+	GOTO	2b
+3:				; wait for start bit (0)
+	BTFSC	PORTB,RX
+	GOTO	3b
+4:				; skip start bit, wait for bit 0 (1)
+	BTFSS	PORTB,RX
+	GOTO	4b
+
+	CLRF	TMR0		; start timer
+	BCF	INTCON,T0IF
+
+5:				; skip bit 0, wait for bit 1 (0)
+	BTFSC	INTCON,T0IF
+	GOTO	1b
+	BTFSC	PORTB,RX
+	GOTO	5b
+6:				; skip bit 1, wait for bit 2 (1)
+	BTFSC	INTCON,T0IF
+	GOTO	1b
+	BTFSS	PORTB,RX
+	GOTO	6b
+7:				; skip bits 2,3, wait for bit 4 (0)
+	BTFSC	INTCON,T0IF
+	GOTO	1b
+	BTFSC	PORTB,RX
+	GOTO	7b
+8:				; skip bits 4,5,6,7, wait for stop bit (1)
+	BTFSC	INTCON,T0IF
+	GOTO	1b
+	BTFSS	PORTB,RX
+	GOTO	8b
+
+	MOVF	TMR0,W
+	MOVWF	TEMP
+	BCF	STATUS,C
+	RRF	TEMP,W		; divide timer value by 2
+	BTFSS	STATUS,C	; need to round down?
+	ADDLW	-1
+
+	BANKSEL	SPBRG
+	MOVWF	SPBRG
+
+	BANKSEL	RCSTA
+	BSF	RCSTA,CREN	; start UART RX
+
 	RETURN
 
 setdata:
@@ -555,6 +638,11 @@ putc:
 	MOVWF	TXREG		; transmit byte
 	RETURN
 
+flush:
+	BTFSS	PIR1,TXIF
+	GOTO	flush
+	RETURN
+
 ; PTRH:PTRL contains pointer to table entry
 lookupTBL:
 	MOVF	PTRH,W
@@ -573,6 +661,7 @@ puts:
 	BTFSC	STATUS,Z
 	INCF	PTRH,F
 	GOTO	puts
+
 
 ; W contains byte value
 ; retains W (useful for debugging)
@@ -610,4 +699,4 @@ gethex:
 	IORWF	TEMP,W
 	RETURN
 
-	END
+	.end

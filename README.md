@@ -2,7 +2,8 @@ The original sources can be found here: https://github.com/gmcgarry/eeprog
 
 # eeprog
 
-Basic programmer for AT28C64 EEPROMs using two 74HC595 logic chips and PIC16F62x microcontroller.
+Basic programmer for AT28Cxx EEPROMs using two 74HC595 logic chips and a
+PIC16F62x microcontroller.
 
 ![Programmer](programmer.png)
 
@@ -15,19 +16,23 @@ It currently supports the following features:
 - write hex line
 - unlock AT28C256 SDP
 - toggle between ROM types (1KB, 2KB, 4KB, 8KB, 16KB, 32KB)
-
-In the future:
-
-- toggle-select chip type
-- page writes for CAT28C256
+- autobaud detection (2400 - 38400bps)
 - /DATA polling
+
+The current hardware cannot support page-writes for CAT28C256, since it takes
+longer that 150 microseconds to load the address into the shift registers.
+Instead, drop the baud down to 2400 for very slow byte-writes.
 
 ## Software
 
-The programmer communicates with the host system over UART.  The
-UART must be configured for 19200,N81.  Here's a quick way to connect:
+The programmer communicates with the host system over UART.  The UART must be
+configured for N81.  There is baud detection to autmatically determine the
+baud of the connection.  Here's a quick way to connect:
 
 	$ screen /dev/ttyUSB 19200
+
+Press enter/return a few times to get passed the autobaud detection.  You'll
+see the startup banner.
 
 The following commands are supported:
 
@@ -39,6 +44,7 @@ The following commands are supported:
 | ':' | parse to eol as ihex line to write memory |
 | 'T' | toggle ROM type (1KB, 2KB, 4KB, 8KB, 16KB, 32KB) |
 | 'U' | unlock SDP on CAT28C256 EEPROMs |
+| 'R' | restart autobaud detection |
 
 With these commands, an EEPROM can be programmed by cut-and-pasting a
 .ihex file into the terminal program.
