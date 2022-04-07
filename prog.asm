@@ -39,7 +39,7 @@ PTRH		EQU	0x22
 PTRL		EQU	0x23
 BYTECNT		EQU	0x24	; WriteMemory loop
 
-ROMMASK		EQU	0x26 ; mask is (1<<ROMTYPE) 32KB=0x80, 16KB=0x40, 8KB=0x20, 4KB=0x10, 2KB=0x08, 1KB=0x04
+ROMMASK		EQU	0x26	; mask is (1<<ROMTYPE) 32KB=0x80, 16KB=0x40, 8KB=0x20, 4KB=0x10, 2KB=0x08, 1KB=0x04
 ROM1KB		EQU	2
 ROM2KB		EQU	3
 ROM4KB		EQU	4
@@ -174,7 +174,6 @@ ToggleRomType:
 	; fallthru
 
 PrintRomType:
-
 	MOVLW	high romtypes
 	MOVWF	PTRH
 	MOVLW	low romtypes
@@ -372,10 +371,8 @@ WriteMemory:
  	BCF	PORTB,WE	; write enable
  	BSF	PORTB,WE	; write disable
  
-	; delaying will cause the UART to overrun
 	; hopefully the UART isn't running greater than 19200
 	; - CAT28C256 requires 5ms...
-;	CALL	delay
 	CALL	wait_for_write	; W=PORTA output
 
 	INCF	PTRL,F
@@ -420,7 +417,6 @@ EraseMemory:
 
 	BCF	PORTB,WE	; write enable
 	BSF	PORTB,WE	; write disable
-;	CALL	delay
 	CALL	wait_for_write	; W=PORTA output
 
 	INCF	PTRL,F
@@ -471,31 +467,6 @@ wait_for_write
 	BANKSEL	TRISA		; setup port A for output
 	CLRF	TRISA
  	BANKSEL	PORTA
-	RETURN
-
-; 1ms - AT28C64, 5ms - CAT28C256
-delay:
-	BTFSC	ROMMASK,ROM32KB
-	GOTO	delay5
-	; fall-through
-; delay 1ms
-delay1:						; 2
-	MOVLW	MCLK / 4 / 1000 / 4 - 1		; 1
-1:
-	ADDLW	-1				; 1
-	BTFSC	STATUS,C			; 1
-	GOTO	1b				; 2
-	RETURN					; 2
-; delay (more than) 5ms
-delay5:
-	CALL delay1
-	CALL delay1
-	CALL delay1
-	CALL delay1
-	CALL delay1	; CAT28C256 seem to need more
-	CALL delay1
-	CALL delay1
-	CALL delay1
 	RETURN
 
 ; W contains byte
